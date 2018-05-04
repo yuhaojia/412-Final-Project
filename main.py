@@ -17,8 +17,8 @@ categorical_str = 'Product_Info_1, Product_Info_3, Product_Info_5, Product_Info_
 continuous_str = 'Product_Info_4, Ins_Age, Ht, Wt, BMI, Employment_Info_1, Employment_Info_4, Employment_Info_6, Insurance_History_5, Family_Hist_2, Family_Hist_3, Family_Hist_4, Family_Hist_5'
 discrete_str = 'Medical_History_1, Medical_History_10, Medical_History_15, Medical_History_24, Medical_History_32'
 
-Use_library = False
-MLP = False
+Use_library = True # False
+MLP = True
 if MLP:
     from keras.models import Sequential
     from keras.layers import Dense, Dropout, BatchNormalization, Activation
@@ -109,8 +109,8 @@ def preprocessing(data, test_data):
     X = fill_missing(data)
     test_X = fill_missing(test_data)
 
-    scaler = StandardScaler()
-    # scaler = MinMaxScaler()
+    # scaler = StandardScaler()
+    scaler = MinMaxScaler()
     # scaler = RobustScaler()
     X = scaler.fit_transform(X)
     test_X = scaler.transform(test_X)
@@ -123,7 +123,11 @@ def MLP_model():
     :return: model
     """
     model = Sequential()
-    model.add(Dense(512 * 2, input_dim=len(X[0]), kernel_initializer='uniform'))
+    model.add(Dense(512 * 4, input_dim=len(X[0]), kernel_initializer='uniform'))
+    model.add(BatchNormalization())
+    model.add(Activation('relu'))
+    model.add(Dropout(0.5))
+    model.add(Dense(512 * 4, kernel_initializer='uniform'))
     model.add(BatchNormalization())
     model.add(Activation('relu'))
     model.add(Dropout(0.5))
@@ -176,7 +180,7 @@ def fit_model(model, X, y):
     """
     if MLP:
         model.compile(loss='categorical_crossentropy', optimizer='adam', metrics=['accuracy'])
-        model.fit(X, y, validation_split=0.3, epochs=15, batch_size=256, shuffle=True)
+        model.fit(X, y, validation_split=0.3, epochs=15, batch_size=128, shuffle=True)
     else:
         model.fit(X, y)
         print(cross_val_score(model, X, y, cv=5))
