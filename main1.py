@@ -172,7 +172,7 @@ if __name__ == "__main__":
         #y1 = y.values()
         m,n = data.shape
         print(m,n)
-        lr1 = LogisticRegression.LogisticRegression(X, y, 1.0, 8000, regularized=True, normalization = 'l2')
+        lr1 = LogisticRegression.LogisticRegression(X, y, 1.0, 8000)
         learntParameters, final_costs = lr1.train(X, y, np.unique(y))
         print('Number of classes', len(np.unique(y)))
         print('learntParameters(one per class): ',learntParameters)
