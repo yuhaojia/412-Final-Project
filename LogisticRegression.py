@@ -8,11 +8,8 @@ import math
 from scipy.optimize import fmin_bfgs
 
 class LogisticRegression:
-	def __init__(self, data, labels, alpha = 1, num_iters = 100, regularized= False, debug = False, normalization = 'l2'):
+	def __init__(self, data, labels, alpha = 1, num_iters = 100):
 
-		self.normalization_mode = normalization
-		self.regularized = regularized
-		self.debug = debug
 		self.num_iters = num_iters
 		self.alpha = alpha
 		assert(len(np.unique(labels))>=2)
@@ -21,10 +18,7 @@ class LogisticRegression:
 
 	def train(self, data, Olabels, unique_classes):
 
-		print('training....')
-		debug = self.debug
-		regularized = self.regularized
-
+		print('training the data')
 		num_iters = self.num_iters
 		m,n = data.shape
 
@@ -40,83 +34,57 @@ class LogisticRegression:
 			labels[np.where(Olabels == o_label_name)] = new_label_name
 
 		labels = labels.reshape((len(labels),1))
-
 		num_classes = len(unique_classes)
-
-		Init_Thetas = [] # to hold initial values of theta
-		
-		Thetas = [] # to hold final values of theta to return
-		
-		Cost_Thetas = [] # cost associated with each theta
-		
-		Cost_History_Theta = [] # contains list of varying cost thetas
+		Init_Thetas = []
+		Thetas = [] 
+		Cost_Thetas = [] 
+		Cost_History_Theta = [] 
 		
 		
-		if(num_classes > 2):
-			for eachInitTheta in range(num_classes):
+		for eachInitTheta in range(num_classes):
 				theta_init = np.zeros((n,1))
 				Init_Thetas.append(theta_init)
 				pass
+		for eachClass in range(num_classes):
 
-			for eachClass in range(num_classes):
+ 			local_labels = np.zeros(labels.shape)
 
-	 			local_labels = np.zeros(labels.shape)
+ 			
+ 			local_labels[np.where(labels == eachClass)] = 1
 
-	 			
-	 			local_labels[np.where(labels == eachClass)] = 1
+ 			assert(len(np.unique(local_labels)) == 2)
+ 			assert(len(local_labels) == len(labels))
 
-	 			assert(len(np.unique(local_labels)) == 2)
-	 			assert(len(local_labels) == len(labels))
+ 			init_theta = Init_Thetas[eachClass]
 
-	 			init_theta = Init_Thetas[eachClass]
+ 			new_theta, final_cost = self.computeGradient(data, local_labels, init_theta)
 
-	 			new_theta, final_cost = self.computeGradient(data, local_labels, init_theta)
-
-	 			Thetas.append(new_theta)
-	 			Cost_Thetas.append(final_cost)
+ 			Thetas.append(new_theta)
+ 			Cost_Thetas.append(final_cost)
 			
 		return Thetas, Cost_Thetas
 	
 
 	def classify(self, data, Thetas):
-
-		debug = self.debug
 		assert(len(Thetas)>0)
-		
 		if(len(Thetas) > 1):
 			mvals = []	
 			for eachTheta in Thetas:
 				mvals.append(self.sigmoidCalc(np.dot(data, eachTheta)))
-
 				pass
 			return mvals.index(max(mvals))+1
-
 		elif(len(Thetas) == 1):
-
-
 			cval = round(self.sigmoidCalc(np.dot(data, Thetas[0])))+1.0
-
 			return cval
-
 	
 	def sigmoidCalc(self, data):
-
-		debug = self.debug
 		data = np.array(data, dtype = np.longdouble)
-
 		g = 1/(1+np.exp(-data))
-		
 		return g
 
 	def computeCost(self,data, labels, init_theta):
 
-		debug = self.debug
-		regularized = self.regularized
-		if(regularized == True):
-			llambda = 1.0
-
-		else:
-			llambda = 0
+		llambda = 1.0
 
 		m,n = data.shape
 		
@@ -125,11 +93,7 @@ class LogisticRegression:
 		grad = np.zeros(init_theta.shape)
 
 		theta2 = init_theta[range(1,init_theta.shape[0]),:]
-		if(self.normalization_mode == "l1"):
-			regularized_parameter = np.dot(llambda/(2*m), np.sum( np.abs(theta2)))
-
-		else:
-			regularized_parameter = np.dot(llambda/(2*m), np.sum( theta2 * theta2))
+		regularized_parameter = np.dot(llambda/(2*m), np.sum( theta2 * theta2))
 
 		
 		
@@ -140,31 +104,20 @@ class LogisticRegression:
 
 	def computeGradient(self,data, labels, init_theta):
 		alpha = self.alpha
-		debug = self.debug
 		num_iters = self.num_iters
 		m,n = data.shape
-		regularized = self.regularized
 
-		if(regularized == True):
-			llambda = 1
-		else:
-			llambda = 0
+		llambda = 1
 		
 		for eachIteration in range(num_iters):
 			cost = self.computeCost(data, labels, init_theta)
-			if(debug):
-				print('iteration: ', eachIteration)
-				print('cost: ', cost)
-			
+			print('iteration: ', eachIteration)
+			print('cost: ', cost)
 			B = self.sigmoidCalc(np.dot(data, init_theta) - labels)
-			
 			A = (1/m)*np.transpose(data)
-			
 			grad = np.dot(A,B)
-			
 			A = (self.sigmoidCalc(np.dot(data, init_theta)) - labels )
 			B =  data[:,0].reshape((data.shape[0],1))
-			
 			grad[0] = (1/m) * np.sum(A*B)
 			
 			A = (self.sigmoidCalc(np.dot(data, init_theta)) - labels)
