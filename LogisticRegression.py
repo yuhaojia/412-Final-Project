@@ -1,180 +1,119 @@
-'''
-Logistic Regression classifier class
-'''
 from __future__ import division
 import numpy as np
-import scipy
-import math
-from scipy.optimize import fmin_bfgs
+
 
 class LogisticRegression:
-	def __init__(self, data, labels, alpha = 1, num_iters = 100, regularized= False, debug = False, normalization = 'l2'):
+    def __init__(self, data, labels, alpha=1, num_iters=100, regularized=False, debug=False, normalization='l2'):
 
-		self.normalization_mode = normalization
-		self.regularized = regularized
-		self.debug = debug
-		self.num_iters = num_iters
-		self.alpha = alpha
-		assert(len(np.unique(labels))>=2)
-		pass
+        self.normalization_mode = normalization
+        self.regularized = regularized
+        self.debug = debug
+        self.num_iters = num_iters
+        self.alpha = alpha
+        assert (len(np.unique(labels)) >= 2)
+        pass
 
+    def train(self, data, old_labels, unique_classes):
+        """
+        Train logistic regression model
+        :param data: training data
+        :param old_labels: original labels
+        :param unique_classes: number of classes
+        :return: model parameters
+        """
 
-	def train(self, data, Olabels, unique_classes):
+        print('training....')
 
-		print('training....')
-		debug = self.debug
-		regularized = self.regularized
+        m, n = data.shape
 
-		num_iters = self.num_iters
-		m,n = data.shape
+        labels = np.zeros(old_labels.shape)
 
-		labels = np.zeros(Olabels.shape)
-		
-		uniq_Olabel_names = np.unique(Olabels)
+        original_label_name = np.unique(old_labels)
 
-		uniq_label_list = range(len(uniq_Olabel_names))
+        label_list = range(len(original_label_name))
 
-		for each in zip(uniq_Olabel_names, uniq_label_list):
-			o_label_name = each[0]
-			new_label_name = each[1]
-			labels[np.where(Olabels == o_label_name)] = new_label_name
+        for each in zip(original_label_name, label_list):
+            o_label_name = each[0]
+            new_label_name = each[1]
+            labels[np.where(old_labels == o_label_name)] = new_label_name
 
-		labels = labels.reshape((len(labels),1))
+        labels = labels.reshape((len(labels), 1))
 
-		num_classes = len(unique_classes)
+        num_classes = len(unique_classes)
 
-		Init_Thetas = [] # to hold initial values of theta
-		
-		Thetas = [] # to hold final values of theta to return
-		
-		Cost_Thetas = [] # cost associated with each theta
-		
-		Cost_History_Theta = [] # contains list of varying cost thetas
-		
-		
-		if(num_classes > 2):
-			for eachInitTheta in range(num_classes):
-				theta_init = np.zeros((n,1))
-				Init_Thetas.append(theta_init)
-				pass
+        init_thetas = []  # to hold initial values of theta
 
-			for eachClass in range(num_classes):
+        thetas = []  # to hold final values of theta to return
 
-	 			local_labels = np.zeros(labels.shape)
+        if num_classes > 2:
+            for eachInitTheta in range(num_classes):
+                theta_init = np.zeros((n, 1))
+                init_thetas.append(theta_init)
+            for eachClass in range(num_classes):
+                local_labels = np.zeros(labels.shape)
 
-	 			
-	 			local_labels[np.where(labels == eachClass)] = 1
+                local_labels[np.where(labels == eachClass)] = 1
 
-	 			assert(len(np.unique(local_labels)) == 2)
-	 			assert(len(local_labels) == len(labels))
+                assert (len(np.unique(local_labels)) == 2)
+                assert (len(local_labels) == len(labels))
 
-	 			init_theta = Init_Thetas[eachClass]
+                init_theta = init_thetas[eachClass]
+                
+                new_theta = self.compute_gradient(data, local_labels, init_theta)
 
-	 			new_theta, final_cost = self.computeGradient(data, local_labels, init_theta)
+                thetas.append(new_theta)
 
-	 			Thetas.append(new_theta)
-	 			Cost_Thetas.append(final_cost)
-			
-		return Thetas, Cost_Thetas
-	
+        return thetas
 
-	def classify(self, data, Thetas):
+    def classify(self, data, thetas):
+        """
+        Predict label
+        :param data:
+        :param thetas:
+        :return:
+        """
+        assert (len(thetas) > 0)
 
-		debug = self.debug
-		assert(len(Thetas)>0)
-		
-		if(len(Thetas) > 1):
-			mvals = []	
-			for eachTheta in Thetas:
-				mvals.append(self.sigmoidCalc(np.dot(data, eachTheta)))
+        if len(thetas) > 1:
+            mvals = []
+            for eachTheta in thetas:
+                mvals.append(self.sigmoid(np.dot(data, eachTheta)))
+            return mvals.index(max(mvals)) + 1
 
-				pass
-			return mvals.index(max(mvals))+1
+        elif len(thetas) == 1:
+            cval = round(self.sigmoid(np.dot(data, thetas[0]))) + 1.0
+            return cval
 
-		elif(len(Thetas) == 1):
+    def sigmoid(self, data):
+        data = np.array(data, dtype=np.longdouble)
+        g = 1 / (1 + np.exp(-data))
+        return g
 
-
-			cval = round(self.sigmoidCalc(np.dot(data, Thetas[0])))+1.0
-
-			return cval
-
-	
-	def sigmoidCalc(self, data):
-
-		debug = self.debug
-		data = np.array(data, dtype = np.longdouble)
-
-		g = 1/(1+np.exp(-data))
-		
-		return g
-
-	def computeCost(self,data, labels, init_theta):
-
-		debug = self.debug
-		regularized = self.regularized
-		if(regularized == True):
-			llambda = 1.0
-
-		else:
-			llambda = 0
-
-		m,n = data.shape
-		
-		J = 0
-
-		grad = np.zeros(init_theta.shape)
-
-		theta2 = init_theta[range(1,init_theta.shape[0]),:]
-		if(self.normalization_mode == "l1"):
-			regularized_parameter = np.dot(llambda/(2*m), np.sum( np.abs(theta2)))
-
-		else:
-			regularized_parameter = np.dot(llambda/(2*m), np.sum( theta2 * theta2))
-
-		
-		
-		J = (-1.0/ m) * ( np.sum( np.log(self.sigmoidCalc( np.dot(data, init_theta))) * labels + ( np.log ( 1 - self.sigmoidCalc(np.dot(data, init_theta)) ) * ( 1 - labels ) )))
-		
-		J = J + regularized_parameter
-		return J
-
-	def computeGradient(self,data, labels, init_theta):
-		alpha = self.alpha
-		debug = self.debug
-		num_iters = self.num_iters
-		m,n = data.shape
-		regularized = self.regularized
-
-		if(regularized == True):
-			llambda = 1
-		else:
-			llambda = 0
-		
-		for eachIteration in range(num_iters):
-			cost = self.computeCost(data, labels, init_theta)
-			if(debug):
-				print('iteration: ', eachIteration)
-				print('cost: ', cost)
-			
-			B = self.sigmoidCalc(np.dot(data, init_theta) - labels)
-			
-			A = (1/m)*np.transpose(data)
-			
-			grad = np.dot(A,B)
-			
-			A = (self.sigmoidCalc(np.dot(data, init_theta)) - labels )
-			B =  data[:,0].reshape((data.shape[0],1))
-			
-			grad[0] = (1/m) * np.sum(A*B)
-			
-			A = (self.sigmoidCalc(np.dot(data, init_theta)) - labels)
-			B = (data[:,range(1,n)])
-			
-			for i in range(1, len(grad)):
-				A = (self.sigmoidCalc(np.dot(data,init_theta)) - labels )
-				B = (data[:,i].reshape((data[:,i].shape[0],1)))
-				grad[i] = (1/m)*np.sum(A*B) + ((llambda/m)*init_theta[i])
-		
-			init_theta = init_theta - (np.dot((alpha/m), grad))
-			
-		return init_theta, cost
+    def compute_gradient(self, data, labels, init_theta):
+        """
+        computer gradient
+        :param data:
+        :param labels:
+        :param init_theta:
+        :return:
+        """
+        alpha = self.alpha
+        num_iters = self.num_iters
+        m, n = data.shape
+        regularized = self.regularized
+        theta = init_theta
+        for eachIteration in range(num_iters):
+            bias = self.sigmoid(np.dot(data, init_theta) - labels)
+            x = (1 / m) * np.transpose(data)
+            grad = np.dot(x, bias)
+            
+            bias = self.sigmoid(np.dot(data, init_theta)) - labels
+            for i in range(len(grad)):
+                xj = (data[:, i].reshape((data[:, i].shape[0], 1)))
+                if regularized:
+                    grad[i] = (np.sum(bias * xj) + init_theta[i]) / m
+                else:
+                    grad[i] = np.sum(bias * xj) / m
+            # update gradient
+            theta = theta - (np.dot((alpha / m), grad))
+        return theta

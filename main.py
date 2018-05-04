@@ -10,12 +10,14 @@ from sklearn.preprocessing import Imputer, LabelEncoder, StandardScaler, MinMaxS
 from sklearn.cross_validation import cross_val_score
 from sklearn.utils import resample
 from npy_to_csv import npy2csv
+from LogisticRegression import LogisticRegression
 
 
 categorical_str = 'Product_Info_1, Product_Info_3, Product_Info_5, Product_Info_6, Product_Info_7, Employment_Info_2, Employment_Info_3, Employment_Info_5, InsuredInfo_1, InsuredInfo_2, InsuredInfo_3, InsuredInfo_4, InsuredInfo_5, InsuredInfo_6, InsuredInfo_7, Insurance_History_1, Insurance_History_2, Insurance_History_3, Insurance_History_4, Insurance_History_7, Insurance_History_8, Insurance_History_9, Family_Hist_1, Medical_History_2, Medical_History_3, Medical_History_4, Medical_History_5, Medical_History_6, Medical_History_7, Medical_History_8, Medical_History_9, Medical_History_11, Medical_History_12, Medical_History_13, Medical_History_14, Medical_History_16, Medical_History_17, Medical_History_18, Medical_History_19, Medical_History_20, Medical_History_21, Medical_History_22, Medical_History_23, Medical_History_25, Medical_History_26, Medical_History_27, Medical_History_28, Medical_History_29, Medical_History_30, Medical_History_31, Medical_History_33, Medical_History_34, Medical_History_35, Medical_History_36, Medical_History_37, Medical_History_38, Medical_History_39, Medical_History_40, Medical_History_41'
 continuous_str = 'Product_Info_4, Ins_Age, Ht, Wt, BMI, Employment_Info_1, Employment_Info_4, Employment_Info_6, Insurance_History_5, Family_Hist_2, Family_Hist_3, Family_Hist_4, Family_Hist_5'
 discrete_str = 'Medical_History_1, Medical_History_10, Medical_History_15, Medical_History_24, Medical_History_32'
 
+Use_library = False
 MLP = False
 if MLP:
     from keras.models import Sequential
@@ -68,6 +70,7 @@ def fill_missing(data):
         df4 = pd.DataFrame(imp4.fit_transform(df4), columns=dummy_list)
         X = df.join(df2).join(df3).join(df4)
     except:
+        # If the features types are not provided, we applied mean imputer to all columns
         imp = Imputer(missing_values='NaN', strategy='mean', axis=0)
         X = imp.fit_transform(data)
     return X
@@ -83,19 +86,26 @@ def preprocessing(data, test_data):
     data = data.drop(['Id'], 1)
     test_data = test_data.drop(['Id'], 1)
     try:
-        print(data.Response.value_counts())
+        # print(data.Response.value_counts())
         for i in range(1, 8):
             if i == 4 or i == 3:
                 df_minority = data[data.Response == i]
                 df_sub = resample(df_minority, replace=True, n_samples=500, random_state=123)
                 data = pd.concat([data, df_sub])
-        print(data.Response.value_counts())
+        # print(data.Response.value_counts())
         data = pd.get_dummies(data, columns=['Product_Info_2'], drop_first=True)
         test_data = pd.get_dummies(test_data, columns=['Product_Info_2'], drop_first=True)
     except:
+        # it still can be applied to other dataset, as we will skip the resample and get dummy
         print('Not insurance dataset, need adjust')
 
     y = data.pop('Response')
+
+    if MLP:
+        # Encode label to one hot coding
+        encoded_Y = LabelEncoder().fit(y).transform(y)
+        y = np_utils.to_categorical(encoded_Y)
+
     X = fill_missing(data)
     test_X = fill_missing(test_data)
 
@@ -185,9 +195,7 @@ def predict(model, X):
         res = prob_to_class(res)
     else:
         res = model.predict(X)
-    if save_res:
-        np.save('result', res)
-        npy2csv('result.npy', "result" + str(np.random.randint(0, 1000)) + ".csv")
+    return res
 
 
 if __name__ == "__main__":
@@ -195,12 +203,18 @@ if __name__ == "__main__":
     test_data = pd.read_csv('testing.csv')
     X, test_X, y = preprocessing(data, test_data)
 
-    if MLP:
-        # Encode label to one hot coding
-        encoded_Y = LabelEncoder().fit(y).transform(y)
-        y = np_utils.to_categorical(encoded_Y)
-
-    print(X.shape, test_X.shape)
-    model = build_model()
-    model = fit_model(model, X, y)
-    predict(model, test_X)
+    # print(X.shape, test_X.shape)
+    if Use_library:
+        model = build_model()
+        model = fit_model(model, X, y)
+        res = predict(model, test_X)
+    else:
+        model = LogisticRegression(X, y, alpha=0.1, num_iters=50, regularized=True, normalization='l2')
+        params = model.train(X, y, np.unique(y))
+        classifedLabels = []
+        for eachData in test_X:
+            classifedLabels.append(model.classify(eachData, params))
+        res = np.array(classifedLabels)
+    if save_res:
+        np.save('result', res)
+        npy2csv('result.npy', "result" + str(np.random.randint(0, 1000)) + ".csv")
